@@ -1,0 +1,5 @@
+repositories:
+  freertos_apps:
+    type: git
+    url: https://hub.fastgit.xyz/micro-ros/freertos_apps
+    version: galactic

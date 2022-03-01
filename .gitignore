@@ -1,0 +1,16 @@
+# src
+dev_ws/src/
+mcu_ws/src/
+agent_ws/src/
+extension/src/
+# tool
+toolchain/
+# colcon build system
+colcon_dev
+colcon_mcu
+colcon_agent
+*_ws/build/
+*_ws/install/
+*_ws/log/
+# temp files
+ros2.repos
