@@ -14,3 +14,4 @@ colcon_agent
 *_ws/log/
 # temp files
 ros2.repos
+.vscode/.cortex-debug.*

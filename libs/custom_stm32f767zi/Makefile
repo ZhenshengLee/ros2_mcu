@@ -13,23 +13,35 @@
 ######################################
 # target
 ######################################
-TARGET = custom_stm32f767zi
+TARGET = micro-ROS
 
 
 ######################################
 # building variables
 ######################################
 # debug build?
-DEBUG = 1
+DEBUG ?= 1
 # optimization
-OPT = -Og
+
+ifeq ($(DEBUG), 1)
+	OPT = -O0
+  	BUILD_TYPE = Debug
+else
+	OPT = -Og
+	BUILD_TYPE = Release
+endif
 
 
 #######################################
 # paths
 #######################################
 # Build path
-BUILD_DIR = build
+EXTENSIONS_DIR = $(shell pwd)
+TOPFOLDER = $(EXTENSIONS_DIR)/../..
+UROS_DIR = $(TOPFOLDER)/mcu_ws
+BUILD_DIR = $(EXTENSIONS_DIR)/build
+UROS_APP = int32_publisher
+UROS_APP_FOLDER = $(TOPFOLDER)/apps/$(UROS_APP)
 
 ######################################
 # source
@@ -156,7 +168,20 @@ Middlewares/Third_Party/LwIP/src/core/ipv6/nd6.c \
 Middlewares/Third_Party/LwIP/src/core/ipv6/ip6_frag.c \
 Middlewares/Third_Party/LwIP/src/core/ipv6/ip6.c \
 Middlewares/Third_Party/LwIP/system/OS/sys_arch.c \
-Middlewares/Third_Party/LwIP/src/apps/mqtt/mqtt.c  
+Middlewares/Third_Party/LwIP/src/apps/mqtt/mqtt.c \
+FreeRTOS-Plus-POSIX/source/FreeRTOS_POSIX_utils.c \
+FreeRTOS-Plus-POSIX/source/FreeRTOS_POSIX_clock.c \
+FreeRTOS-Plus-POSIX/source/FreeRTOS_POSIX_sched.c \
+FreeRTOS-Plus-POSIX/source/FreeRTOS_POSIX_unistd.c \
+FreeRTOS-Plus-POSIX/source/FreeRTOS_POSIX_pthread.c \
+UROS/Src/custom_memory_manager.c \
+UROS/Src/allocators.c \
+UROS/Src/microros_transports.c \
+$(wildcard $(UROS_APP_FOLDER)/*.c) \
+
+# Removing heap4 manager while being polite with STM32CubeMX
+TMPVAR := $(C_SOURCES)
+C_SOURCES := $(filter-out Middlewares/Third_Party/FreeRTOS/Source/portable/MemMang/heap_4.c, $(TMPVAR))
 
 # ASM sources
 ASM_SOURCES =  \
@@ -166,23 +191,25 @@ startup_stm32f767xx.s
 #######################################
 # binaries
 #######################################
-PREFIX = arm-none-eabi-
 # The gcc compiler bin path can be either defined in make command via GCC_PATH variable (> make GCC_PATH=xxx)
 # either it can be added to the PATH environment variable.
+CROSS_COMPILE_NAME_PREFIX=arm-none-eabi-
+CROSS_COMPILE = $(TOPFOLDER)/toolchain/gcc-arm-none-eabi-8-2019-q3-update/bin/$(CROSS_COMPILE_NAME_PREFIX)
+
 ifdef GCC_PATH
-CC = $(GCC_PATH)/$(PREFIX)gcc
-AS = $(GCC_PATH)/$(PREFIX)gcc -x assembler-with-cpp
-CP = $(GCC_PATH)/$(PREFIX)objcopy
-SZ = $(GCC_PATH)/$(PREFIX)size
+CC = $(GCC_PATH)/$(CROSS_COMPILE_NAME_PREFIX)gcc
+AS = $(GCC_PATH)/$(CROSS_COMPILE_NAME_PREFIX)gcc -x assembler-with-cpp
+CP = $(GCC_PATH)/$(CROSS_COMPILE_NAME_PREFIX)objcopy
+SZ = $(GCC_PATH)/$(CROSS_COMPILE_NAME_PREFIX)size
 else
-CC = $(PREFIX)gcc
-AS = $(PREFIX)gcc -x assembler-with-cpp
-CP = $(PREFIX)objcopy
-SZ = $(PREFIX)size
+CC = $(CROSS_COMPILE)gcc
+AS = $(CROSS_COMPILE)gcc -x assembler-with-cpp
+CP = $(CROSS_COMPILE)objcopy
+SZ = $(CROSS_COMPILE)size
 endif
 HEX = $(CP) -O ihex
 BIN = $(CP) -O binary -S
- 
+
 #######################################
 # CFLAGS
 #######################################
@@ -200,12 +227,13 @@ MCU = $(CPU) -mthumb $(FPU) $(FLOAT-ABI)
 
 # macros for gcc
 # AS defines
-AS_DEFS = 
+AS_DEFS =
 
 # C defines
 C_DEFS =  \
 -DUSE_HAL_DRIVER \
--DSTM32F767xx
+-DSTM32F767xx \
+-D_TIMEVAL_DEFINED
 
 
 # AS includes
@@ -231,14 +259,51 @@ C_INCLUDES =  \
 -IMiddlewares/Third_Party/LwIP/src/include/lwip/priv \
 -IMiddlewares/Third_Party/LwIP/src/include/lwip/prot \
 -IMiddlewares/Third_Party/LwIP/src/include/netif \
+-IMiddlewares/Third_Party/LwIP/system/arch \
 -IMiddlewares/Third_Party/LwIP/src/include/compat/posix \
 -IMiddlewares/Third_Party/LwIP/src/include/compat/posix/arpa \
 -IMiddlewares/Third_Party/LwIP/src/include/compat/posix/net \
 -IMiddlewares/Third_Party/LwIP/src/include/compat/posix/sys \
 -IMiddlewares/Third_Party/LwIP/src/include/compat/stdc \
--IMiddlewares/Third_Party/LwIP/system/arch \
--IDrivers/CMSIS/Include
+-IDrivers/CMSIS/Core/Include \
+-IDrivers/CMSIS/Include \
+-IUROS/Inc \
+-IFreeRTOS-Plus-POSIX/include \
+-IFreeRTOS-Plus-POSIX/include/portable/empty_portable \
+-IFreeRTOS-Plus-POSIX/include/portable \
+-Iinclude \
+-Iinclude/private \
+-I$(UROS_APP_FOLDER) \
 
+MICROROS_INCLUDES += $(shell find $(UROS_DIR)/install -name 'include' | sed -E "s/(.*)/-I\1/")
+MICROROS_INCLUDES += -I$(EXTENSIONS_DIR)/include
+MICROROS_INCLUDES += -I$(EXTENSIONS_DIR)/include/FreeRTOS_POSIX
+C_INCLUDES += $(MICROROS_INCLUDES)
+
+COLCON_INCLUDES += $(EXTENSIONS_DIR)/FreeRTOS-Plus-POSIX/include
+COLCON_INCLUDES += $(EXTENSIONS_DIR)/include
+COLCON_INCLUDES += $(EXTENSIONS_DIR)/include/private
+COLCON_INCLUDES += $(EXTENSIONS_DIR)/include/FreeRTOS_POSIX
+COLCON_INCLUDES += $(EXTENSIONS_DIR)/include/FreeRTOS_POSIX/sys
+COLCON_INCLUDES += $(EXTENSIONS_DIR)/src/hal/interface
+COLCON_INCLUDES += $(EXTENSIONS_DIR)/src/modules/interface
+COLCON_INCLUDES += $(EXTENSIONS_DIR)/src/utils/interface
+COLCON_INCLUDES += $(EXTENSIONS_DIR)/src/config
+COLCON_INCLUDES += $(EXTENSIONS_DIR)/src/drivers/interface
+COLCON_INCLUDES += $(EXTENSIONS_DIR)/Middlewares/Third_Party/LwIP/src/include/posix
+COLCON_INCLUDES += $(EXTENSIONS_DIR)/Middlewares/Third_Party/LwIP/src/include
+COLCON_INCLUDES += $(EXTENSIONS_DIR)/Core/Inc
+COLCON_INCLUDES += $(EXTENSIONS_DIR)/UROS/Inc
+COLCON_INCLUDES += $(EXTENSIONS_DIR)/Drivers/STM32F7xx_HAL_Driver/Inc
+COLCON_INCLUDES += $(EXTENSIONS_DIR)/Drivers/CMSIS/Device/ST/STM32F7xx/Include
+COLCON_INCLUDES += $(EXTENSIONS_DIR)/Drivers/CMSIS/Core/Include
+COLCON_INCLUDES += $(EXTENSIONS_DIR)/Middlewares/Third_Party/LwIP/system
+COLCON_INCLUDES += $(EXTENSIONS_DIR)/Middlewares/Third_Party/LwIP/src/include/compat/posix
+COLCON_INCLUDES += $(EXTENSIONS_DIR)/Middlewares/Third_Party/LwIP/src/include/compat/posix/arpa
+COLCON_INCLUDES += $(EXTENSIONS_DIR)/Middlewares/Third_Party/LwIP/src/include/compat/posix/net
+COLCON_INCLUDES += $(EXTENSIONS_DIR)/Middlewares/Third_Party/LwIP/src/include/compat/posix/sys
+COLCON_INCLUDES += $(EXTENSIONS_DIR)/Middlewares/Third_Party/LwIP/src/include/compat/stdc
+COLCON_INCLUDES_STR := $(foreach x,$(COLCON_INCLUDES),$(x)\n)
 
 # compile gcc flags
 ASFLAGS = $(MCU) $(AS_DEFS) $(AS_INCLUDES) $(OPT) -Wall -fdata-sections -ffunction-sections
@@ -253,6 +318,8 @@ endif
 # Generate dependency information
 CFLAGS += -MMD -MP -MF"$(@:%.o=%.d)"
 
+# arccpuflags
+ARCHCPUFLAGS = $(MCU) $(C_DEFS) $(OPT) -Wall -fdata-sections -ffunction-sections
 
 #######################################
 # LDFLAGS
@@ -261,25 +328,68 @@ CFLAGS += -MMD -MP -MF"$(@:%.o=%.d)"
 LDSCRIPT = STM32F767ZITx_FLASH.ld
 
 # libraries
-LIBS = -lc -lm -lnosys 
-LIBDIR = 
+LIBS = -lc -lm -lnosys
+LIBDIR =
 LDFLAGS = $(MCU) -specs=nano.specs -T$(LDSCRIPT) $(LIBDIR) $(LIBS) -Wl,-Map=$(BUILD_DIR)/$(TARGET).map,--cref -Wl,--gc-sections
 
 # default action: build all
 all: $(BUILD_DIR)/$(TARGET).elf $(BUILD_DIR)/$(TARGET).hex $(BUILD_DIR)/$(TARGET).bin
 
+#######################################
+# build micro-ROS
+#######################################
+
+arm_toolchain: $(EXTENSIONS_DIR)/arm_toolchain.cmake.in
+	rm -f $(EXTENSIONS_DIR)/arm_toolchain.cmake; \
+	cat $(EXTENSIONS_DIR)/arm_toolchain.cmake.in | \
+		sed "s/@CROSS_COMPILE@/$(subst /,\/,$(CROSS_COMPILE))/g" | \
+		sed "s/@FREERTOS_TOPDIR@/$(subst /,\/,$(TOPFOLDER))/g" | \
+		sed "s/@ARCH_CPU_FLAGS@/\"$(ARCHCPUFLAGS)\"/g" | \
+		sed "s/@ARCH_OPT_FLAGS@/\"$(ARCHOPTIMIZATION)\"/g" | \
+		sed "s/@INCLUDES@/$(subst /,\/,$(COLCON_INCLUDES_STR))/g" \
+		> $(EXTENSIONS_DIR)/arm_toolchain.cmake
+
+colcon_compile: arm_toolchain
+	cd $(UROS_DIR); \
+	colcon build \
+		--packages-ignore-regex=.*_cpp \
+		--metas $(UROS_DIR)/colcon.meta $(UROS_APP_FOLDER)/app-colcon.meta \
+		--cmake-args \
+		"--no-warn-unused-cli" \
+		-DCMAKE_POSITION_INDEPENDENT_CODE=OFF \
+		-DTHIRDPARTY=ON \
+		-DBUILD_SHARED_LIBS=OFF \
+		-DBUILD_TESTING=OFF \
+		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
+		-DCMAKE_TOOLCHAIN_FILE=$(EXTENSIONS_DIR)/arm_toolchain.cmake \
+		-DCMAKE_VERBOSE_MAKEFILE=ON; \
+
+libmicroros: colcon_compile
+	mkdir -p $(UROS_DIR)/libmicroros; cd $(UROS_DIR)/libmicroros; \
+	for file in $$(find $(UROS_DIR)/install/ -name '*.a'); do \
+		folder=$$(echo $$file | sed -E "s/(.+)\/(.+).a/\2/"); \
+		mkdir -p $$folder; cd $$folder; ar x $$file; \
+		for f in *; do \
+			mv $$f ../$$folder-$$f; \
+		done; \
+		cd ..; rm -rf $$folder; \
+	done ; \
+	ar rc libmicroros.a *.obj; mkdir -p $(BUILD_DIR); cp libmicroros.a $(BUILD_DIR); ranlib $(BUILD_DIR)/libmicroros.a; \
+	cd ..; rm -rf libmicroros;
 
 #######################################
 # build the application
 #######################################
 # list of objects
 OBJECTS = $(addprefix $(BUILD_DIR)/,$(notdir $(C_SOURCES:.c=.o)))
+OBJECTS += $(BUILD_DIR)/libmicroros.a
+
 vpath %.c $(sort $(dir $(C_SOURCES)))
 # list of ASM program objects
 OBJECTS += $(addprefix $(BUILD_DIR)/,$(notdir $(ASM_SOURCES:.s=.o)))
 vpath %.s $(sort $(dir $(ASM_SOURCES)))
 
-$(BUILD_DIR)/%.o: %.c Makefile | $(BUILD_DIR) 
+$(BUILD_DIR)/%.o: %.c Makefile | $(BUILD_DIR)
 	$(CC) -c $(CFLAGS) -Wa,-a,-ad,-alms=$(BUILD_DIR)/$(notdir $(<:.c=.lst)) $< -o $@
 
 $(BUILD_DIR)/%.o: %.s Makefile | $(BUILD_DIR)
@@ -291,19 +401,19 @@ $(BUILD_DIR)/$(TARGET).elf: $(OBJECTS) Makefile
 
 $(BUILD_DIR)/%.hex: $(BUILD_DIR)/%.elf | $(BUILD_DIR)
 	$(HEX) $< $@
-	
+
 $(BUILD_DIR)/%.bin: $(BUILD_DIR)/%.elf | $(BUILD_DIR)
-	$(BIN) $< $@	
-	
+	$(BIN) $< $@
+
 $(BUILD_DIR):
-	mkdir $@		
+	mkdir $@
 
 #######################################
 # clean up
 #######################################
 clean:
-	-rm -fR $(BUILD_DIR)
-  
+	-rm -fR $(BUILD_DIR);
+
 #######################################
 # dependencies
 #######################################

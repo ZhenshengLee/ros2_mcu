@@ -45,6 +45,10 @@
 
 /* USER CODE BEGIN Includes */
 /* Section where include file can be added */
+#define configUSE_POSIX_ERRNO                   1
+#define configUSE_STATS_FORMATTING_FUNCTIONS    1
+#define configUSE_APPLICATION_TASK_TAG          1
+#define INCLUDE_xTaskGetHandle                  1
 /* USER CODE END Includes */
 
 /* Ensure definitions are only used by the compiler, and not by the assembler. */

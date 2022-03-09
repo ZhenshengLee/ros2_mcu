@@ -17,6 +17,7 @@
   ******************************************************************************
   */
 /* USER CODE END Header */
+
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "cmsis_os.h"
@@ -24,6 +25,25 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "stm32f7xx_hal.h"
+#include "api.h"
+
+#include <allocators.h>
+#include <rcl/rcl.h>
+#include <uxr/client/client.h>
+#include <ucdr/microcdr.h>
+
+#include <rmw_microros/rmw_microros.h>
+
+#include <microros_transports.h>
+
+#include <sys/socket.h>
+#include <ip_addr.h>
+
+#include "FreeRTOS.h"
+#include "task.h"
+
+#include <rmw_microxrcedds_c/config.h>
 
 /* USER CODE END Includes */
 
@@ -71,12 +91,34 @@ static void MX_USB_OTG_FS_PCD_Init(void);
 void initTaskFunction(void *argument);
 
 /* USER CODE BEGIN PFP */
+#define BUFSIZE 4096
+char buffer[BUFSIZE];
+extern struct netif gnetif;
+UART_HandleTypeDef * printf_uart = NULL;
+// extern appMain;
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+int __io_putchar(int ch)
+{
+  uint8_t c[1];
+  c[0] = ch & 0x00FF;
+  if (printf_uart != NULL){
+     HAL_UART_Transmit(printf_uart, &c[0], 1, 10);
+  }
+  return ch;
+}
 
+int _write(int file,char *ptr, int len)
+{
+  int DataIdx;
+  for(DataIdx= 0; DataIdx< len; DataIdx++){
+  __io_putchar(*ptr++);
+  }
+  return len;
+}
 /* USER CODE END 0 */
 
 /**
@@ -110,12 +152,15 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_USART3_UART_Init();
   MX_DMA_Init();
+  MX_USART3_UART_Init();
   MX_USART6_UART_Init();
   MX_USB_OTG_FS_PCD_Init();
-  /* USER CODE BEGIN 2 */
 
+  /* USER CODE BEGIN 2 */
+#ifdef RMW_UXRCE_TRANSPORT_UDP
+  printf_uart = &huart3;
+#endif
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -417,15 +462,90 @@ void initTaskFunction(void *argument)
   /* init code for LWIP */
   MX_LWIP_Init();
   /* USER CODE BEGIN 5 */
-  /* Infinite loop */
-  for(;;)
-  {
-    osDelay(1);
+  HAL_GPIO_WritePin(USB_PowerSwitchOn_GPIO_Port, USB_PowerSwitchOn_Pin, GPIO_PIN_RESET);
+  bool availableNetwork = false;
+
+#ifdef RMW_UXRCE_TRANSPORT_CUSTOM
+  availableNetwork = true;
+  rmw_uros_set_custom_transport(
+    true,
+    (void *) &huart3,
+    freertos_serial_open,
+    freertos_serial_close,
+    freertos_serial_write,
+    freertos_serial_read);
+#elif defined(RMW_UXRCE_TRANSPORT_UDP)
+  printf("Ethernet Initialization\r\n");
+
+	//Waiting for an IP
+  printf("Waiting for IP\r\n");
+  int retries = 0;
+	while(gnetif.ip_addr.addr == 0 && retries < 10){
+    osDelay(500);
+    retries++;
+  };
+
+  availableNetwork = (gnetif.ip_addr.addr != 0);
+  if (availableNetwork){
+    printf("IP: %s\r\n",ip4addr_ntoa(&gnetif.ip_addr));
+  }else{
+    printf("Impossible to retrieve an IP\n");
   }
+#endif
+
+  // Launch app thread when IP configured
+  rcl_allocator_t freeRTOS_allocator = rcutils_get_zero_initialized_allocator();
+  freeRTOS_allocator.allocate = __freertos_allocate;
+  freeRTOS_allocator.deallocate = __freertos_deallocate;
+  freeRTOS_allocator.reallocate = __freertos_reallocate;
+  freeRTOS_allocator.zero_allocate = __freertos_zero_allocate;
+
+  if (!rcutils_set_default_allocator(&freeRTOS_allocator)) {
+      printf("Error on default allocators (line %d)\n",__LINE__);
+  }
+
+  osThreadAttr_t attributes;
+  memset(&attributes, 0x0, sizeof(osThreadAttr_t));
+  attributes.name = "microROS_app";
+  attributes.stack_size = 4*6000;
+  attributes.priority = (osPriority_t) osPriorityNormal1;
+  osThreadNew(appMain, NULL, &attributes);
+
+  osDelay(500);
+  char ptrTaskList[500];
+  vTaskList(ptrTaskList);
+  printf("**********************************\r\n");
+  printf("Task  State   Prio    Stack    Num\r\n");
+  printf("**********************************\r\n");
+  printf(ptrTaskList);
+  printf("**********************************\r\n");
+
+  TaskHandle_t xHandle;
+  xHandle = xTaskGetHandle("microROS_app");
+
+  while (1){
+    if (eTaskGetState(xHandle) != eSuspended && availableNetwork){
+      HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
+      osDelay(100);
+      HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);
+      osDelay(100);
+      HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
+      osDelay(150);
+      HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);
+      osDelay(500);
+    }else{
+      HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
+      osDelay(1000);
+      HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);
+      osDelay(1000);
+    }
+  }
+
+
   /* USER CODE END 5 */
 }
 
- /**
+/**
   * @brief  Period elapsed callback in non blocking mode
   * @note   This function is called  when TIM1 interrupt took place, inside
   * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
