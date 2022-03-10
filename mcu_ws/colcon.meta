@@ -18,16 +18,18 @@
             "cmake-args": [
                 "-DUCLIENT_PIC=OFF",
                 "-DUCLIENT_PROFILE_DISCOVERY=OFF",
-                "-DUCLIENT_PROFILE_CUSTOM_TRANSPORT=ON",
                 "-DUCLIENT_PROFILE_STREAM_FRAMING=ON",
+                "-DUCLIENT_PROFILE_CUSTOM_TRANSPORT=OFF",
                 "-DUCLIENT_PROFILE_SERIAL=OFF",
-                "-DUCLIENT_PROFILE_UDP=OFF",
+                "-DUCLIENT_PROFILE_UDP=ON",
                 "-DUCLIENT_PROFILE_TCP=OFF"
             ]
         },
         "rmw_microxrcedds": {
             "cmake-args": [
-                "-DRMW_UXRCE_TRANSPORT=custom"
+                "-DRMW_UXRCE_TRANSPORT=udp",
+                "-DRMW_UXRCE_DEFAULT_UDP_IP=192.168.1.110",
+                "-DRMW_UXRCE_DEFAULT_UDP_PORT=8000"
             ]
         }
     }

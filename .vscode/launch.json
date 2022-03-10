@@ -5,7 +5,19 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "nucleo_stm32f767zi-micro-ROS-debug",
+            "name": "custom_stm32f767zi-stlink-dbg",
+            "type": "cortex-debug",
+            "request": "launch",
+            "servertype": "stutil",
+            "cwd": "${workspaceRoot}",
+            "executable": "${workspaceRoot}/libs/custom_stm32f767zi/build/micro-ROS.elf",
+            "runToEntryPoint": "appMain",
+            "armToolchainPath": "${workspaceRoot}/toolchain/gcc-arm-none-eabi-8-2019-q3-update/bin",
+            "svdFile": "${workspaceRoot}/.vscode/svd/STM32F767.svd",
+        },
+        {
+            // not available
+            "name": "custom_stm32f767zi-openocd-dbg",
             "type": "cortex-debug",
             "request": "launch",
             "servertype": "openocd",
