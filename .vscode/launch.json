@@ -16,6 +16,30 @@
             "svdFile": "${workspaceRoot}/.vscode/svd/STM32F767.svd",
         },
         {
+            "name": "host-gdb-run",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceRoot}/app_ws/install/micro_ros_int32_publisherlib/micro_ros_int32_publisher/int32_publisher",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceRoot}",
+            "environment": [
+                {
+                    "name": "GA_LOG_LEVEL",
+                    "value": "t"
+                }
+            ],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
             // not available
             "name": "custom_stm32f767zi-openocd-dbg",
             "type": "cortex-debug",

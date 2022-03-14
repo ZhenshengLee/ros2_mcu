@@ -34,7 +34,7 @@ TOPFOLDER = $(EXTENSIONS_DIR)/../../
 UROS_DIR = $(TOPFOLDER)/mcu_ws
 BUILD_DIR = $(EXTENSIONS_DIR)/build
 UROS_APP = int32_publisher
-UROS_APP_FOLDER = $(TOPFOLDER)/apps/$(UROS_APP)
+UROS_APP_FOLDER = $(TOPFOLDER)/app_ws/src/$(UROS_APP)
 
 ######################################
 # source

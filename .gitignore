@@ -1,6 +1,7 @@
 # src
 dev_ws/src/
 mcu_ws/src/
+host_ws/src/
 agent_ws/src/
 extension/src/
 # tool
