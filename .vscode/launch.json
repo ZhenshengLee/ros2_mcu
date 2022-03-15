@@ -16,17 +16,40 @@
             "svdFile": "${workspaceRoot}/.vscode/svd/STM32F767.svd",
         },
         {
+            // manually run task "ros2_run_debug_server"
+            "name": "host-gdb-local-server",
+            "request": "launch",
+            "type": "cppdbg",
+            "miDebuggerServerAddress": "localhost:8009",
+            "cwd": "${workspaceRoot}",
+            "program": "./app_ws/install/micro_ros_lifecycle_node/lib/micro_ros_lifecycle_node/lifecycle_node",
+            "stopAtEntry": false,
+            "linux": {
+                "MIMode": "gdb",
+                "setupCommands": [
+                    {
+                        "description": "Enable pretty-printing for gdb",
+                        "text": "-enable-pretty-printing",
+                        "ignoreFailures": true
+                    }
+                ]
+            }
+            // "preLaunchTask": "debug_server",
+        },
+        {
+            // not available if not source
             "name": "host-gdb-run",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceRoot}/app_ws/install/micro_ros_int32_publisherlib/micro_ros_int32_publisher/int32_publisher",
+            "program": "${workspaceRoot}/app_ws/install/micro_ros_lifecycle_node/lib/micro_ros_lifecycle_node/lifecycle_node",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceRoot}",
             "environment": [
                 {
-                    "name": "GA_LOG_LEVEL",
-                    "value": "t"
+                    "name": "RMW_IMPLEMENTATION",
+                    "value": "rmw_microxrcedds"
+                    // "value": "rmw_fastrtps_cpp"
                 }
             ],
             "externalConsole": false,

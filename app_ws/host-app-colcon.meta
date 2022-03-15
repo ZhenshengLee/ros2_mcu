@@ -1,0 +1,14 @@
+{
+    "names":{
+        "micro_ros_int32_publisher":{
+            "cmake-args":[
+                "-DCMAKE_BUILD_TYPE=Debug"
+            ]
+        },
+        "micro_ros_lifecycle_node":{
+            "cmake-args":[
+                "-DCMAKE_BUILD_TYPE=Debug"
+            ]
+        }
+    }
+}
