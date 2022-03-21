@@ -17,7 +17,6 @@
   ******************************************************************************
   */
 /* USER CODE END Header */
-
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "cmsis_os.h"
@@ -74,8 +73,8 @@ PCD_HandleTypeDef hpcd_USB_OTG_FS;
 osThreadId_t initTaskHandle;
 const osThreadAttr_t initTask_attributes = {
   .name = "initTask",
-  .priority = (osPriority_t) osPriorityNormal7,
-  .stack_size = 3000 * 4
+  .priority = (osPriority_t) osPriorityBelowNormal3,
+  .stack_size = 8000 * 4
 };
 /* USER CODE BEGIN PV */
 
@@ -156,7 +155,6 @@ int main(void)
   MX_USART3_UART_Init();
   MX_USART6_UART_Init();
   MX_USB_OTG_FS_PCD_Init();
-
   /* USER CODE BEGIN 2 */
 #ifdef RMW_UXRCE_TRANSPORT_UDP
   printf_uart = &huart3;
@@ -545,7 +543,7 @@ void initTaskFunction(void *argument)
   /* USER CODE END 5 */
 }
 
-/**
+ /**
   * @brief  Period elapsed callback in non blocking mode
   * @note   This function is called  when TIM1 interrupt took place, inside
   * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
