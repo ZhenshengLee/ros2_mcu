@@ -4,6 +4,8 @@ mcu_ws/src/
 host_ws/src/
 agent_ws/src/
 extension/src/
+ertps_ws/src/
+docker_ws/src/
 # tool
 toolchain/
 # colcon build system
@@ -16,3 +18,4 @@ colcon_agent
 # temp files
 ros2.repos
 .vscode/.cortex-debug.*
+.dev_bash_hist
