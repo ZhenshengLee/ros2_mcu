@@ -1,0 +1,5 @@
+repositories:
+  extra/control_msgs:
+    type: git
+    url: https://hub.fastgit.xyz/ros-controls/control_msgs
+    version: galactic-devel

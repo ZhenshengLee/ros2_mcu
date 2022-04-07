@@ -5,6 +5,17 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "custom_stm32f767zi_ertps-stlink-dbg",
+            "type": "cortex-debug",
+            "request": "launch",
+            "servertype": "stutil",
+            "cwd": "${workspaceRoot}",
+            "executable": "${workspaceRoot}/libs/custom_stm32f767zi_ertps/build/micro-ROS.elf",
+            "runToEntryPoint": "appMain",
+            "armToolchainPath": "${workspaceRoot}/toolchain/gcc-arm-none-eabi-9-2020-q2-update/bin",
+            "svdFile": "${workspaceRoot}/.vscode/svd/STM32F767.svd",
+        },
+        {
             "name": "custom_stm32f767zi-stlink-dbg",
             "type": "cortex-debug",
             "request": "launch",

@@ -6,9 +6,18 @@
 extern int absoluteUsedMemory;
 extern int usedMemory;
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 void * __freertos_allocate(size_t size, void * state);
 void __freertos_deallocate(void * pointer, void * state);
 void * __freertos_reallocate(void * pointer, size_t size, void * state);
 void * __freertos_zero_allocate(size_t number_of_elements, size_t size_of_element, void * state);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // _ALLOCATORS_H_

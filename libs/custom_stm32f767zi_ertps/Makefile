@@ -38,7 +38,7 @@ endif
 # Build path
 EXTENSIONS_DIR = $(shell pwd)
 TOPFOLDER = $(EXTENSIONS_DIR)/../..
-UROS_DIR = $(TOPFOLDER)/mcu_ws
+UROS_DIR = $(TOPFOLDER)/ertps_ws
 BUILD_DIR = $(EXTENSIONS_DIR)/build
 UROS_APP = int32_publisher
 UROS_APP_FOLDER = $(TOPFOLDER)/app_ws/src/$(UROS_APP)
@@ -176,12 +176,15 @@ FreeRTOS-Plus-POSIX/source/FreeRTOS_POSIX_unistd.c \
 FreeRTOS-Plus-POSIX/source/FreeRTOS_POSIX_pthread.c \
 UROS/Src/custom_memory_manager.c \
 UROS/Src/allocators.c \
-UROS/Src/microros_transports.c \
 $(wildcard $(UROS_APP_FOLDER)/*.c) \
+# Core/Src/sample_main_ertps.c \
 
 # Removing heap4 manager while being polite with STM32CubeMX
 TMPVAR := $(C_SOURCES)
 C_SOURCES := $(filter-out Middlewares/Third_Party/FreeRTOS/Source/portable/MemMang/heap_4.c, $(TMPVAR))
+
+CXX_SOURCES = \
+# Core/Src/main.cpp \
 
 # ASM sources
 ASM_SOURCES =  \
@@ -194,16 +197,18 @@ startup_stm32f767xx.s
 # The gcc compiler bin path can be either defined in make command via GCC_PATH variable (> make GCC_PATH=xxx)
 # either it can be added to the PATH environment variable.
 CROSS_COMPILE_NAME_PREFIX=arm-none-eabi-
-CROSS_COMPILE = $(TOPFOLDER)/toolchain/gcc-arm-none-eabi-8-2019-q3-update/bin/$(CROSS_COMPILE_NAME_PREFIX)
+CROSS_COMPILE = $(TOPFOLDER)/toolchain/gcc-arm-none-eabi-9-2020-q2-update/bin/$(CROSS_COMPILE_NAME_PREFIX)
 
 ifdef GCC_PATH
 CC = $(GCC_PATH)/$(CROSS_COMPILE_NAME_PREFIX)gcc
-AS = $(GCC_PATH)/$(CROSS_COMPILE_NAME_PREFIX)gcc -x assembler-with-cpp
+CXX = $(GCC_PATH)/$(CROSS_COMPILE_NAME_PREFIX)g++
+AS = $(GCC_PATH)/$(CROSS_COMPILE_NAME_PREFIX)g++ -x assembler-with-cpp
 CP = $(GCC_PATH)/$(CROSS_COMPILE_NAME_PREFIX)objcopy
 SZ = $(GCC_PATH)/$(CROSS_COMPILE_NAME_PREFIX)size
 else
 CC = $(CROSS_COMPILE)gcc
-AS = $(CROSS_COMPILE)gcc -x assembler-with-cpp
+CXX = $(CROSS_COMPILE)g++
+AS = $(CROSS_COMPILE)g++ -x assembler-with-cpp
 CP = $(CROSS_COMPILE)objcopy
 SZ = $(CROSS_COMPILE)size
 endif
@@ -233,7 +238,9 @@ AS_DEFS =
 C_DEFS =  \
 -DUSE_HAL_DRIVER \
 -DSTM32F767xx \
--D_TIMEVAL_DEFINED
+-D_TIMEVAL_DEFINED \
+-DSTM32CUBEIDE \
+-DENOTSUP=1 -DECANCELED=1 -DEOWNERDEAD=1 -DENOTRECOVERABLE=1 \
 
 
 # AS includes
@@ -280,6 +287,8 @@ MICROROS_INCLUDES += -I$(EXTENSIONS_DIR)/include
 MICROROS_INCLUDES += -I$(EXTENSIONS_DIR)/include/FreeRTOS_POSIX
 C_INCLUDES += $(MICROROS_INCLUDES)
 
+CXX_INCLUDES = $(C_INCLUDES) \
+
 COLCON_INCLUDES += $(EXTENSIONS_DIR)/FreeRTOS-Plus-POSIX/include
 COLCON_INCLUDES += $(EXTENSIONS_DIR)/include
 COLCON_INCLUDES += $(EXTENSIONS_DIR)/include/private
@@ -305,6 +314,30 @@ COLCON_INCLUDES += $(EXTENSIONS_DIR)/Middlewares/Third_Party/LwIP/src/include/co
 COLCON_INCLUDES += $(EXTENSIONS_DIR)/Middlewares/Third_Party/LwIP/src/include/compat/posix/net
 COLCON_INCLUDES += $(EXTENSIONS_DIR)/Middlewares/Third_Party/LwIP/src/include/compat/posix/sys
 COLCON_INCLUDES += $(EXTENSIONS_DIR)/Middlewares/Third_Party/LwIP/src/include/compat/stdc
+COLCON_INCLUDES += $(EXTENSIONS_DIR)/Drivers/STM32F7xx_HAL_Driver/Inc/Legacy
+COLCON_INCLUDES += $(EXTENSIONS_DIR)/Middlewares/Third_Party/FreeRTOS/Source/include
+COLCON_INCLUDES += $(EXTENSIONS_DIR)/Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2
+COLCON_INCLUDES += $(EXTENSIONS_DIR)/Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM7/r0p1
+COLCON_INCLUDES += $(EXTENSIONS_DIR)/Middlewares/Third_Party/LwIP/src/include/netif/ppp
+COLCON_INCLUDES += $(EXTENSIONS_DIR)/Drivers/CMSIS/Device/ST/STM32F7xx/Include
+COLCON_INCLUDES += $(EXTENSIONS_DIR)/Middlewares/Third_Party/LwIP/src/include/lwip
+COLCON_INCLUDES += $(EXTENSIONS_DIR)/Middlewares/Third_Party/LwIP/src/include/lwip/apps
+COLCON_INCLUDES += $(EXTENSIONS_DIR)/Middlewares/Third_Party/LwIP/src/include/lwip/priv
+COLCON_INCLUDES += $(EXTENSIONS_DIR)/Middlewares/Third_Party/LwIP/src/include/lwip/prot
+COLCON_INCLUDES += $(EXTENSIONS_DIR)/Middlewares/Third_Party/LwIP/src/include/netif
+COLCON_INCLUDES += $(EXTENSIONS_DIR)/Middlewares/Third_Party/LwIP/system/arch
+COLCON_INCLUDES += $(EXTENSIONS_DIR)/Middlewares/Third_Party/LwIP/src/include/compat/posix
+COLCON_INCLUDES += $(EXTENSIONS_DIR)/Middlewares/Third_Party/LwIP/src/include/compat/posix/arpa
+COLCON_INCLUDES += $(EXTENSIONS_DIR)/Middlewares/Third_Party/LwIP/src/include/compat/posix/net
+COLCON_INCLUDES += $(EXTENSIONS_DIR)/Middlewares/Third_Party/LwIP/src/include/compat/posix/sys
+COLCON_INCLUDES += $(EXTENSIONS_DIR)/Middlewares/Third_Party/LwIP/src/include/compat/stdc
+COLCON_INCLUDES += $(EXTENSIONS_DIR)/Drivers/CMSIS/Core/Include
+COLCON_INCLUDES += $(EXTENSIONS_DIR)/Drivers/CMSIS/Include
+COLCON_INCLUDES += $(EXTENSIONS_DIR)/FreeRTOS-Plus-POSIX/include
+COLCON_INCLUDES += $(EXTENSIONS_DIR)/FreeRTOS-Plus-POSIX/include/portable/empty_portable
+COLCON_INCLUDES += $(EXTENSIONS_DIR)/FreeRTOS-Plus-POSIX/include/portable
+COLCON_INCLUDES += $(EXTENSIONS_DIR)/include
+COLCON_INCLUDES += $(EXTENSIONS_DIR)/include/private
 COLCON_INCLUDES_STR := $(foreach x,$(COLCON_INCLUDES),$(x)\n)
 
 # compile gcc flags
@@ -312,8 +345,12 @@ ASFLAGS = $(MCU) $(AS_DEFS) $(AS_INCLUDES) $(OPT) -Wall -fdata-sections -ffuncti
 
 CFLAGS = $(MCU) $(C_DEFS) $(C_INCLUDES) $(OPT) -Wall -fdata-sections -ffunction-sections
 
+CXXFLAGS = $(MCU) $(C_DEFS) $(C_INCLUDES) $(OPT) -Wall -fdata-sections -ffunction-sections
+# -x c++
+
 ifeq ($(DEBUG), 1)
 CFLAGS += -g -gdwarf-2
+CXXFLAGS += -g -gdwarf-2
 endif
 
 
@@ -323,6 +360,9 @@ CFLAGS += -MMD -MP -MF"$(@:%.o=%.d)"
 # arccpuflags
 ARCHCPUFLAGS = $(MCU) $(C_DEFS) $(OPT) -Wall -fdata-sections -ffunction-sections
 
+# Generate dependency information
+CXXFLAGS += -MMD -MP -MF"$(@:%.o=%.d)"
+
 #######################################
 # LDFLAGS
 #######################################
@@ -330,7 +370,8 @@ ARCHCPUFLAGS = $(MCU) $(C_DEFS) $(OPT) -Wall -fdata-sections -ffunction-sections
 LDSCRIPT = STM32F767ZITx_FLASH.ld
 
 # libraries
-LIBS = -lc -lm -lnosys
+LIBS = -lc -lm -lnosys -lstdc++ -lsupc++
+
 LIBDIR =
 LDFLAGS = $(MCU) -specs=nano.specs -T$(LDSCRIPT) $(LIBDIR) $(LIBS) -Wl,-Map=$(BUILD_DIR)/$(TARGET).map,--cref -Wl,--gc-sections
 
@@ -353,9 +394,10 @@ arm_toolchain: $(EXTENSIONS_DIR)/arm_toolchain.cmake.in
 
 colcon_compile: arm_toolchain
 	cd $(UROS_DIR); \
+	export RMW_IMPLEMENTATION=rmw_embeddedrtps; \
 	colcon build \
 		--packages-ignore-regex=.*_cpp \
-		--metas $(UROS_DIR)/colcon.meta $(UROS_APP_FOLDER)/app-colcon.meta \
+		--metas $(UROS_DIR)/colcon.meta $(UROS_APP_FOLDER)/app-ertps-colcon.meta \
 		--cmake-args \
 		"--no-warn-unused-cli" \
 		-DCMAKE_POSITION_INDEPENDENT_CODE=OFF \
@@ -387,12 +429,19 @@ OBJECTS = $(addprefix $(BUILD_DIR)/,$(notdir $(C_SOURCES:.c=.o)))
 OBJECTS += $(BUILD_DIR)/libmicroros.a
 
 vpath %.c $(sort $(dir $(C_SOURCES)))
+
+OBJECTS += $(addprefix $(BUILD_DIR)/,$(notdir $(CXX_SOURCES:.cpp=.o)))
+vpath %.cpp $(sort $(dir $(CXX_SOURCES)))
+
 # list of ASM program objects
 OBJECTS += $(addprefix $(BUILD_DIR)/,$(notdir $(ASM_SOURCES:.s=.o)))
 vpath %.s $(sort $(dir $(ASM_SOURCES)))
 
 $(BUILD_DIR)/%.o: %.c Makefile | $(BUILD_DIR)
 	$(CC) -c $(CFLAGS) -Wa,-a,-ad,-alms=$(BUILD_DIR)/$(notdir $(<:.c=.lst)) $< -o $@
+
+$(BUILD_DIR)/%.o: %.cpp Makefile | $(BUILD_DIR)
+	$(CC) -c $(CXXFLAGS) -Wa,-a,-ad,-alms=$(BUILD_DIR)/$(notdir $(<:.c=.lst)) $< -o $@
 
 $(BUILD_DIR)/%.o: %.s Makefile | $(BUILD_DIR)
 	$(AS) -c $(CFLAGS) $< -o $@

@@ -30,7 +30,11 @@
 #include <allocators.h>
 #include <rcl/rcl.h>
 #include <ucdr/microcdr.h>
+#include <rcl/error_handling.h>
+#include <rclc/rclc.h>
+#include <rclc/executor.h>
 
+#include <std_msgs/msg/int32.h>
 #include <sys/socket.h>
 #include <ip_addr.h>
 
@@ -111,6 +115,7 @@ int _write(int file,char *ptr, int len)
   }
   return len;
 }
+
 /* USER CODE END 0 */
 
 /**
@@ -148,6 +153,7 @@ int main(void)
   MX_USART3_UART_Init();
   MX_USART6_UART_Init();
   MX_USB_OTG_FS_PCD_Init();
+
   /* USER CODE BEGIN 2 */
   printf_uart = &huart3;
   /* USER CODE END 2 */
@@ -476,23 +482,16 @@ void initTaskFunction(void *argument)
   freeRTOS_allocator.allocate = __freertos_allocate;
   freeRTOS_allocator.deallocate = __freertos_deallocate;
   freeRTOS_allocator.reallocate = __freertos_reallocate;
-  freeRTOS_allocator.zero_allocate = __freertos_zero_allocate;
+  freeRTOS_allocator.zero_allocate =  __freertos_zero_allocate;
 
   if (!rcutils_set_default_allocator(&freeRTOS_allocator)) {
-      printf("Error on default allocators (line %d)\n",__LINE__);
+	 printf("Error on default allocators (line %d)\n", __LINE__);
   }
-
-  osThreadAttr_t attributes;
-  memset(&attributes, 0x0, sizeof(osThreadAttr_t));
-  attributes.name = "microROS_app";
-  attributes.stack_size = 4*6000;
-  attributes.priority = (osPriority_t) osPriorityBelowNormal3;
-  osThreadNew(appMain, NULL, &attributes);
 
   osDelay(500);
   char ptrTaskList[500];
   vTaskList(ptrTaskList);
-  printf("************main.c****************\r\n");
+  printf("*******sample_main_ertps.c********\r\n");
   printf("Task  State   Prio    Stack    Num\r\n");
   printf("**********************************\r\n");
   printf(ptrTaskList);
@@ -501,25 +500,37 @@ void initTaskFunction(void *argument)
   TaskHandle_t xHandle;
   xHandle = xTaskGetHandle("microROS_app");
 
-  while (1){
-    if (eTaskGetState(xHandle) != eSuspended && availableNetwork){
-      HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
-      osDelay(100);
-      HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);
-      osDelay(100);
-      HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
-      osDelay(150);
-      HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);
-      osDelay(500);
-    }else{
-      HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
-      osDelay(1000);
-      HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);
-      osDelay(1000);
-    }
+  // micro-ROS app
+
+  rcl_publisher_t publisher;
+  std_msgs__msg__Int32 msg;
+  rclc_support_t support;
+  rcl_allocator_t allocator;
+  rcl_node_t node;
+
+  allocator = rcl_get_default_allocator();
+
+  //create init_options
+  rclc_support_init(&support, 0, NULL, &allocator);
+
+  // create node
+  rclc_node_init_default(&node, "cubemx_node", "", &support);
+
+  // create publisher
+  rclc_publisher_init_default(
+    &publisher,
+    &node,
+    ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int32),
+    "cubemx_publisher");
+
+  msg.data = 0;
+
+  for(;;) {
+    (void)! rcl_publish(&publisher, &msg, NULL);
+    msg.data++;
+    printf("Sent: %d\n", msg.data);
+    osDelay(portTICK_RATE_MS*1000);
   }
-
-
   /* USER CODE END 5 */
 }
 

@@ -18,4 +18,7 @@ colcon_agent
 # temp files
 ros2.repos
 .vscode/.cortex-debug.*
+# docker temp
 .dev_bash_hist
+# sync
+_gsdata_/

@@ -18,6 +18,7 @@
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
+#include <rtps/rtps.h>
 #include "main.h"
 #include "cmsis_os.h"
 #include "lwip.h"
@@ -71,6 +72,9 @@ const osThreadAttr_t initTask_attributes = {
 };
 /* USER CODE BEGIN PV */
 
+const size_t DATA_SIZE = 16;
+const size_t NUM_SAMPLES = 10050;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -93,7 +97,7 @@ UART_HandleTypeDef * printf_uart = NULL;
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-int __io_putchar(int ch)
+extern "C" int __io_putchar(int ch)
 {
   uint8_t c[1];
   c[0] = ch & 0x00FF;
@@ -103,7 +107,7 @@ int __io_putchar(int ch)
   return ch;
 }
 
-int _write(int file,char *ptr, int len)
+extern "C" int _write(int file,char *ptr, int len)
 {
   int DataIdx;
   for(DataIdx= 0; DataIdx< len; DataIdx++){
@@ -111,6 +115,57 @@ int _write(int file,char *ptr, int len)
   }
   return len;
 }
+
+// Used to read out registers
+extern "C"  void prvGetRegistersFromStack( uint32_t *pulFaultStackAddress )
+{
+  /* These are volatile to try and prevent the compiler/linker optimising them
+  away as the variables never actually get used.  If the debugger won't show the
+  values of the variables, make them global my moving their declaration outside
+  of this function. */
+  volatile uint32_t r0;
+  volatile uint32_t r1;
+  volatile uint32_t r2;
+  volatile uint32_t r3;
+  volatile uint32_t r12;
+  volatile uint32_t lr; /* Link register. */
+  volatile uint32_t pc; /* Program counter. */
+  volatile uint32_t psr;/* Program status register. */
+
+  r0 = pulFaultStackAddress[ 0 ];
+  r1 = pulFaultStackAddress[ 1 ];
+  r2 = pulFaultStackAddress[ 2 ];
+  r3 = pulFaultStackAddress[ 3 ];
+
+  r12 = pulFaultStackAddress[ 4 ];
+  lr = pulFaultStackAddress[ 5 ];
+  pc = pulFaultStackAddress[ 6 ];
+  psr = pulFaultStackAddress[ 7 ];
+
+  /* When the following line is hit, the variables contain the register values. */
+  for( ;; );
+}
+
+void * operator new( size_t size )
+{
+  return pvPortMalloc( size );
+}
+
+void operator delete( void * ptr )
+{
+  vPortFree ( ptr );
+}
+
+extern "C" void vApplicationStackOverflowHook( TaskHandle_t xTask, signed char *pcTaskName ){
+  printf("Stackoverflow\n");
+  while(1);
+}
+
+extern "C" void vApplicationMallocFailedHook( void ){
+  printf("Malloc failed\n");
+  while(1);
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -148,6 +203,7 @@ int main(void)
   MX_USART3_UART_Init();
   MX_USART6_UART_Init();
   MX_USB_OTG_FS_PCD_Init();
+
   /* USER CODE BEGIN 2 */
   printf_uart = &huart3;
   /* USER CODE END 2 */
@@ -176,6 +232,7 @@ int main(void)
   initTaskHandle = osThreadNew(initTaskFunction, NULL, &initTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
+  volatile int heap_size = rtps::Config::OVERALL_HEAP_SIZE;
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
 
@@ -214,7 +271,7 @@ void SystemClock_Config(void)
   /** Configure the main internal regulator output voltage
   */
   __HAL_RCC_PWR_CLK_ENABLE();
-  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
+   __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
@@ -437,6 +494,58 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 
+/* LATENCY TEST  RTPS*/
+//Callback function to set the boolean to true upon a match
+void setTrue(void* args){
+  *static_cast<volatile bool*>(args) = true;
+}
+
+void message_callback(void* callee, const rtps::ReaderCacheChange& cacheChange){
+  rtps::Writer* writer = (rtps::Writer*) callee;
+  static std::array<uint8_t,10> data{};
+  data.fill(10);
+  auto* change = writer->newChange(rtps::ChangeKind_t::ALIVE, data.data(), data.size());
+}
+
+//Function to start the RTPS Test
+void startRTPStest(){
+
+  //Initialize variables and complete RTPS initialization
+  bool subMatched = false;
+  bool pubMatched = false;
+  bool received_message = false;
+
+  static rtps::Domain domain(1);
+
+  //Create RTPS participant
+  rtps::Participant* part = domain.createParticipant();
+  if(part == nullptr){
+    return;
+  }
+
+  //Register callback to ensure that a publisher is matched to the writer before sending messages
+  part->registerOnNewPublisherMatchedCallback(setTrue, &pubMatched);
+  part->registerOnNewSubscriberMatchedCallback(setTrue, &subMatched);
+
+  //Create new writer to send messages
+  rtps::Writer* writer = domain.createWriter(*part, "TOLINUX","TEST", false);
+  rtps::Reader* reader = domain.createReader(*part, "TOSTM","TEST", false);
+  reader->registerCallback(&message_callback, writer);
+
+  domain.completeInit();
+
+  //Check that writer creation was successful
+  if(writer == nullptr || reader == nullptr){
+    return;
+  }
+
+  //Wait for the subscriber on the Linux side to match
+  while(!subMatched || !pubMatched){
+
+  }
+
+  while(true){}
+}
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_initTaskFunction */
@@ -471,28 +580,10 @@ void initTaskFunction(void *argument)
     printf("Impossible to retrieve an IP\n");
   }
 
-  // Launch app thread when IP configured
-  rcl_allocator_t freeRTOS_allocator = rcutils_get_zero_initialized_allocator();
-  freeRTOS_allocator.allocate = __freertos_allocate;
-  freeRTOS_allocator.deallocate = __freertos_deallocate;
-  freeRTOS_allocator.reallocate = __freertos_reallocate;
-  freeRTOS_allocator.zero_allocate = __freertos_zero_allocate;
-
-  if (!rcutils_set_default_allocator(&freeRTOS_allocator)) {
-      printf("Error on default allocators (line %d)\n",__LINE__);
-  }
-
-  osThreadAttr_t attributes;
-  memset(&attributes, 0x0, sizeof(osThreadAttr_t));
-  attributes.name = "microROS_app";
-  attributes.stack_size = 4*6000;
-  attributes.priority = (osPriority_t) osPriorityBelowNormal3;
-  osThreadNew(appMain, NULL, &attributes);
-
   osDelay(500);
   char ptrTaskList[500];
   vTaskList(ptrTaskList);
-  printf("************main.c****************\r\n");
+  printf("*************main.cpp*************\r\n");
   printf("Task  State   Prio    Stack    Num\r\n");
   printf("**********************************\r\n");
   printf(ptrTaskList);
@@ -500,6 +591,11 @@ void initTaskFunction(void *argument)
 
   TaskHandle_t xHandle;
   xHandle = xTaskGetHandle("microROS_app");
+
+  printf("startRTPStest.\n");
+  startRTPStest();
+
+  volatile auto size = uxTaskGetStackHighWaterMark(nullptr);
 
   while (1){
     if (eTaskGetState(xHandle) != eSuspended && availableNetwork){
