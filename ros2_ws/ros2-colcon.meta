@@ -1,0 +1,9 @@
+{
+    "names":{
+        "int32_subscriber":{
+            "cmake-args":[
+                "-DCMAKE_BUILD_TYPE=Debug"
+            ]
+        }
+    }
+}
